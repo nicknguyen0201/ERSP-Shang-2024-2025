@@ -23,7 +23,23 @@ class PositionalEncoding(nn.Module):
         # x: (seq_len, batch_size, d_model)
         x = x + self.pe[:x.size(0)]
         return self.dropout(x)
-
+"""
+This is the gausian noise function, uses to add some noise to the dataset to prevent overfiting,
+the noise is calculated with the dataset's gaussian distribution and then multiply by and intensity value, sigma
+sigma can be arbitrarily adjusted, but because the dataset is already normalized so chat gpt recommend starting with sigma=0.1
+"""
+class GaussianNoise(nn.Module):
+    def __init__(self, sigma ):
+        super().__init__()
+        self.sigma = sigma
+        
+    def forward(self, x):
+        if self.training and self.sigma!=0:
+            noise = torch.randn_like(x)*self.sigma
+            return x+noise
+        # don't add noise if not inside training process
+        return x
+        
 class TransformerDecoder(nn.Module):
     """
     Transformer-based decoder to replace the MLP decoder.
@@ -31,7 +47,7 @@ class TransformerDecoder(nn.Module):
     Instead of a simple sequential block, this module uses a transformer decoder.
     A set of learnable query embeddings defines the number of output tokens (i.e. the output sequence length).
     """
-    def __init__(self, ninp, nhid, decoder_n_out, num_queries, num_layers=2, nhead=4, dropout=0.1, **kwargs):
+    def __init__(self, ninp, nhid, decoder_n_out, num_queries, num_layers=5, nhead=4, dropout=0.1,noise_sigma=0.1, **kwargs):
         """
         Args:
             ninp (int): Input dimension (should match model.ninp from TabPFN).
@@ -41,14 +57,16 @@ class TransformerDecoder(nn.Module):
             num_layers (int): Number of transformer decoder layers.
             nhead (int): Number of attention heads.
             dropout (float): Dropout probability.
+            noise_sigma (float): intensity of the noise
         """
         super().__init__()
         # Project the memory (e.g. latent output from TabPFN) into hidden space.
         self.input_linear = nn.Linear(ninp, nhid)
-        
+        # init the gaussian noise
+        self.gaussian_noise=GaussianNoise(noise_sigma)    
         # Positional encoding for the memory sequence.
         self.pos_encoder = PositionalEncoding(nhid, dropout)
-        
+        print (f"dropout is ", dropout)
         # Learnable query embeddings define the output tokens.
         self.query_embed = nn.Embedding(num_queries, nhid)
         
@@ -71,6 +89,9 @@ class TransformerDecoder(nn.Module):
         """
         # Project and add positional encodings to memory.
         memory = self.input_linear(memory)             # -> (memory_seq_len, batch_size, nhid)
+        #new gaussian noise
+        memory =self.gaussian_noise(memory)
+
         memory = self.pos_encoder(memory)
         
         batch_size = memory.size(1)
