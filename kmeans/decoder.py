@@ -25,7 +25,9 @@ class PositionalEncoding(nn.Module):
         return self.dropout(x)
 """
 This is the gausian noise function, uses to add some noise to the dataset to prevent overfiting,
-the noise is calculated with the dataset's gaussian distribution and then multiply by and intensity value, sigma
+the noise is calculated with
+1. randn_like(x) random numbers shape to tensor x from gaussian distribution with mean =0 and stdev =1
+2. Multiply by sigma, the chosen standard deviation for the noise
 sigma can be arbitrarily adjusted, but because the dataset is already normalized so chat gpt recommend starting with sigma=0.1
 """
 class GaussianNoise(nn.Module):
@@ -47,7 +49,7 @@ class TransformerDecoder(nn.Module):
     Instead of a simple sequential block, this module uses a transformer decoder.
     A set of learnable query embeddings defines the number of output tokens (i.e. the output sequence length).
     """
-    def __init__(self, ninp, nhid, decoder_n_out, num_queries, num_layers=5, nhead=4, dropout=0.1,noise_sigma=0.1, **kwargs):
+    def __init__(self, ninp, nhid, decoder_n_out, num_queries, num_layers=5, nhead=4, dropout=0.0,noise_sigma=0.0, **kwargs):
         """
         Args:
             ninp (int): Input dimension (should match model.ninp from TabPFN).
