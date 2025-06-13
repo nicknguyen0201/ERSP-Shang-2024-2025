@@ -188,15 +188,18 @@ def main(args):
         "batch_size_fraction": 0.4  # Using 40% of dataset per batch the code
     })
     # path to current model state_dict
-    model_state_path = "./nick_train_3.pth"
+    model_state_path = "./new_data_model_3.pth"
 
    
-    dataset_files = sorted(glob.glob("train_all_datasets/*.csv"))[:20]
-    centroid_files = sorted(glob.glob("train_all_centroids/results/*.csv"))[:20]
-    #dataset_files = sorted(glob.glob("sub_sampling_train(nick)/train_dataset_1067.csv"))
-    #centroid_files = sorted(glob.glob("sub_sampling_result(nick)/centroids_train_dataset_1067.csv"))
-    #file_path_cv="sub_sampling_cv(nick)/cv_dataset_1067.csv"
-    #file_path_cen_cv= "sub_sampling_cv_result(nick)/centroids_cv_dataset_1067.csv"
+   
+    
+    
+    dataset_files = sorted(glob.glob("new_data_3/train_no_header/*.csv"))
+    centroid_files = sorted(glob.glob("new_data_3/train_result/*.csv"))
+
+    #file_path_cv="new_data/cv/cv_no_header/cv_dataset_46876.csv"
+
+    #file_path_cen_cv= "new_data/cv/cv_result/centroids_cv_dataset_46876.csv"
     # Set device (use CUDA if available)
     if len(dataset_files) != len(centroid_files):
         raise ValueError("Mismatch between dataset files and centroid files.")
@@ -231,7 +234,7 @@ def main(args):
             """ run cv
             df = pd.read_csv(file_path_cv)
             X_cv=df.values
-            """"
+            """
 
             decoder_n_out = max_centroid_dim
             num_queries = 2  # Number of centroids
@@ -248,7 +251,7 @@ def main(args):
             model.cache_trainset_representation = False
 
             # Initialize Transformer Decoder
-            decoder = TransformerDecoder(model.ninp, model.nhid, decoder_n_out, num_queries, num_layers=5, nhead=4, dropout=0.0, sigma=0.0)
+            decoder = TransformerDecoder(model.ninp, model.nhid, decoder_n_out, num_queries, num_layers=5, nhead=4, dropout=0.1, sigma=0.0)
             #dropout used to be 0.1, but I will let it =0.0 for better overfitting
 
             # Move model and decoder to device
@@ -259,6 +262,7 @@ def main(args):
             #X_tensor = torch.as_tensor(X_train, dtype=torch.float32, device=device).unsqueeze(1)
             X_tensor = torch.as_tensor(X, dtype=torch.float32, device=device).unsqueeze(1)
 
+            #cv tensor
             #X_cv_tensor = torch.as_tensor(X_cv, dtype=torch.float32, device=device).unsqueeze(1)
             
             
@@ -279,7 +283,8 @@ def main(args):
                 padding = torch.zeros((y_tensor.shape[0], pad_size), device=device)
                 y_tensor = torch.cat([y_tensor, padding], dim=1)
 
-            y_cv_tensor = parse_centroids(file_path_cen_cv, device)
+            #y_cv_tensor = parse_centroids(file_path_cen_cv, device)
+            
             # Create a Dataset and DataLoader for mini-batch training
             #dataset = TensorDataset(X_tensor, aux)
             #batch_size = max(1, int(0.4 * len(dataset)))  # Use 40% of the dataset per batch (ensuring at least 1 sample)
@@ -292,7 +297,7 @@ def main(args):
 
 
             # Training loop (epochs)
-            for step in range(15):
+            for step in range(13):
                 # --- Training Phase ---
                 model.train()  # Set model to training mode
                 #for batch in data_loader:
@@ -312,12 +317,13 @@ def main(args):
                 loss = fixed_order_centroid_loss(output, y_tensor)
                 
                 print(f"Step: {step}, Loss: {loss.item()}")
+
                 loss.backward()
                 optimizer.step()
                 
 
                
-                
+        
                 """
                 # --- Validation Phase ---
                 model.eval()  # Switch model to evaluation mode

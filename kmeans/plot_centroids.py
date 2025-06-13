@@ -36,7 +36,6 @@ def plot_centroids(data_points, predicted_centroids, ground_truth_centroids, sav
 
     # Show plot
     plt.show()"""
-# we forgot to use PCA
 def plot_centroids(data_points, predicted_centroids, ground_truth_centroids, save_path=None):
     # Convert to numpy arrays if needed
     if torch.is_tensor(data_points):

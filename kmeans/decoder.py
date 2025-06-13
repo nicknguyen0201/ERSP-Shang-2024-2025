@@ -4,6 +4,7 @@ import math
 
 class PositionalEncoding(nn.Module):
     """Sinusoidal positional encoding module."""
+    # changed max_len from 5000 to 10000 for longer datasets
     def __init__(self, d_model, dropout=0.1, max_len=5000):
         super().__init__()
         self.dropout = nn.Dropout(dropout)
