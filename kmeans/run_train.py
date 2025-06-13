@@ -1,34 +1,20 @@
-from sklearn.datasets import load_breast_cancer, make_classification
-from sklearn.metrics import accuracy_score, roc_auc_score, pairwise_distances_argmin_min
-from sklearn.model_selection import train_test_split
-import numpy as np
 import pandas as pd
 from scipy.optimize import linear_sum_assignment
-import tqdm, copy
-import xgboost as xgb
-import lightgbm as lgb
 import re
 import torch
 import torch.nn.functional as F
-import matplotlib.pyplot as plt
 from tabpfn.base import (
     create_inference_engine,
     determine_precision,
     initialize_tabpfn_model,
 )
 from tabpfn.config import ModelInterfaceConfig
-
-from pmlb import fetch_data, regression_dataset_names
 import argparse, os
 import torch.nn as nn
-from sklearn.model_selection import StratifiedShuffleSplit
 from decoder import PositionalEncoding, TransformerDecoder
-from torch.utils.data import TensorDataset, DataLoader
 import glob
-from plot_centroids import plot_centroids
-
 import wandb
-os.makedirs("kumiko_train_plots", exist_ok=True)
+
 def get_trainable_parameters(obj):
     trainable_params = []
 
@@ -190,10 +176,6 @@ def main(args):
     # path to current model state_dict
     model_state_path = "./new_data_model_3.pth"
 
-   
-   
-    
-    
     dataset_files = sorted(glob.glob("new_data_3/train_no_header/*.csv"))
     centroid_files = sorted(glob.glob("new_data_3/train_result/*.csv"))
 
@@ -201,6 +183,7 @@ def main(args):
 
     #file_path_cen_cv= "new_data/cv/cv_result/centroids_cv_dataset_46876.csv"
     # Set device (use CUDA if available)
+    
     if len(dataset_files) != len(centroid_files):
         raise ValueError("Mismatch between dataset files and centroid files.")
 
@@ -227,7 +210,6 @@ def main(args):
             count_datasets+=1
            
             fit_mode = "low_memory"
-            #decoder_n_out = X_train.shape[1]  # Output dimension should match input features
             df = pd.read_csv(file_path)
             X=df.values
 
@@ -252,28 +234,19 @@ def main(args):
 
             # Initialize Transformer Decoder
             decoder = TransformerDecoder(model.ninp, model.nhid, decoder_n_out, num_queries, num_layers=5, nhead=4, dropout=0.1, sigma=0.0)
-            #dropout used to be 0.1, but I will let it =0.0 for better overfitting
+            
 
             # Move model and decoder to device
             model = model.to(device)
             decoder = decoder.to(device)
 
             # Move data tensors to the same device
-            #X_tensor = torch.as_tensor(X_train, dtype=torch.float32, device=device).unsqueeze(1)
             X_tensor = torch.as_tensor(X, dtype=torch.float32, device=device).unsqueeze(1)
-
-            #cv tensor
             #X_cv_tensor = torch.as_tensor(X_cv, dtype=torch.float32, device=device).unsqueeze(1)
             
-            
-           
             aux = torch.zeros(X_tensor.size(0), dtype=X_tensor.dtype, device=device)
-
             #aux_cv = torch.zeros(X_cv_tensor.size(0), dtype=X_cv_tensor.dtype, device=device)
-
-            #aux = -1 * torch.ones(X_tensor.shape[0], dtype=torch.float32, device=device)
-            # print(f"Shape of X_tensor: {X_tensor.shape}")
-
+            
             # Parse centroids and move to the same device
             y_tensor = parse_centroids(file_path_cen, device)
             orig_centroid_dim = y_tensor.shape[1]
@@ -285,24 +258,14 @@ def main(args):
 
             #y_cv_tensor = parse_centroids(file_path_cen_cv, device)
             
-            # Create a Dataset and DataLoader for mini-batch training
-            #dataset = TensorDataset(X_tensor, aux)
-            #batch_size = max(1, int(0.4 * len(dataset)))  # Use 40% of the dataset per batch (ensuring at least 1 sample)
-            #data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
-            
             # Define optimizer and loss function
             trainable_params = list(model.parameters()) + list(decoder.parameters())
             optimizer = torch.optim.Adam(trainable_params, lr=args.lr, weight_decay=args.weight_decay)
-            #criterion = torch.nn.MSELoss().to(device)  # Move loss function to the correct device
-
-
             # Training loop (epochs)
             for step in range(13):
                 # --- Training Phase ---
                 model.train()  # Set model to training mode
-                #for batch in data_loader:
                 optimizer.zero_grad()
-                #batch_X, batch_aux = batch
                 output = model._forward(
                     x=X_tensor, 
                     y=aux,
@@ -312,18 +275,12 @@ def main(args):
                 )
                 output = decoder(output)
                 output = output.squeeze(1)                
-                # Move output to the same device as y_tensor before computing loss
                 output = output.to(device)               
                 loss = fixed_order_centroid_loss(output, y_tensor)
-                
                 print(f"Step: {step}, Loss: {loss.item()}")
-
                 loss.backward()
                 optimizer.step()
                 
-
-               
-        
                 """
                 # --- Validation Phase ---
                 model.eval()  # Switch model to evaluation mode
@@ -351,15 +308,7 @@ def main(args):
                 print(f"Step: {step}, Val Loss: {val_loss.item()}")
                 """
                 
-                
-                            
-
-        
-
-
-        print("No saved model found. Starting from scratch.")
         # Save the model state_dict
-
         torch.save({
             'model_state_dict': model.state_dict(),
             'decoder_state_dict': decoder.state_dict(),
@@ -370,15 +319,6 @@ def main(args):
     else:
         print("nothing runs")
     
-    
-
-    
-
-
-
-        
-
-
 if __name__ == "__main__":
     args = parse_arguments()
     main(args)
