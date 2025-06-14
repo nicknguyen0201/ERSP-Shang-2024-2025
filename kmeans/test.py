@@ -15,49 +15,33 @@ from scipy.optimize import linear_sum_assignment
 from sklearn.metrics import confusion_matrix
 import numpy as np
 import time  # Import the time module
+
+
 def assign_clusters_knn(X, centroids):
     # X: (N, D), centroids: (K, D)
-   
     dists = torch.cdist(X, centroids, p=2)  # shape: (N, K)
     return torch.argmin(dists, dim=1)  # cluster indices for each point
-"""
-def clustering_accuracy(y_true, y_pred):
-    y_true = y_true.cpu().numpy()
-    y_pred = y_pred.cpu().numpy()
 
-    D = max(y_pred.max(), y_true.max()) + 1
-    w = np.zeros((D, D), dtype=np.int64)
-    for i in range(len(y_true)):
-        w[y_pred[i], y_true[i]] += 1
 
-    row_ind, col_ind = linear_sum_assignment(w.max() - w)
-    return sum(w[i, j] for i, j in zip(row_ind, col_ind)) / len(y_true)
-"""
-#to be consistent with how me calculate the accuracy in Elki
-
+# Clustering accuracy using Hungarian matching on confusion matrix
 def clustering_accuracy(true_labels, predicted_labels):
     y_true = true_labels.cpu().numpy()
     y_pred = predicted_labels.cpu().numpy()
-    # Create a contingency (confusion) matrix
     C = confusion_matrix(y_true, y_pred)
-    # print(C)
-    # Use the Hungarian algorithm to maximize the total correct assignments
-    #row_ind and col_ind are 2 numpy array
+
     row_ind, col_ind = linear_sum_assignment(-C)  # We use negative because we want to maximize
-    #print("row_ind ", row_ind)
-    #print("col_ind ",col_ind)
-    # Sum the counts from the optimal assignment
     total_correct = C[row_ind, col_ind].sum()
-    #print("total_correct ", total_correct)
-    # Calculate accuracy as the ratio of correctly assigned samples
+
     accuracy = total_correct / np.sum(C)
-    #print ("sum(C) ", np.sum(C))
-    #print(accuracy)
     return accuracy
+
+# Load CSV as float tensor
 def load_data(file_path):
     df = pd.read_csv(file_path, header=None)
     return torch.tensor(df.values, dtype=torch.float32)
 
+
+# Clear a folder and its contents
 def clear_output_folder(folder_path):
     if os.path.exists(folder_path):
         for file_name in os.listdir(folder_path):
@@ -72,14 +56,17 @@ def clear_output_folder(folder_path):
     else:
         os.makedirs(folder_path)
 
+# Run model and decoder to predict centroids
 def test_model(X_test, model, decoder, device):
     model.eval()
     decoder.eval()
 
     X_test_tensor = X_test.to(device).unsqueeze(1)
     aux_test = torch.zeros(X_test_tensor.shape[0], dtype=torch.float32, device=device)
+
     # Start the timer
     start_time = time.perf_counter()
+
     with torch.no_grad():
         transformer_output = model._forward(
             x=X_test_tensor,
@@ -89,13 +76,17 @@ def test_model(X_test, model, decoder, device):
             single_eval_pos=2,
         )
         pred = decoder(transformer_output).squeeze(1)
+
     # End the timer
     end_time = time.perf_counter()
 
     # Calculate and print the elapsed time
     elapsed_time = end_time - start_time
     print(f"Prediction time: {elapsed_time:.4f} seconds") 
+
     return pred
+
+
 def load_true_cluster_ids(file_path):
     """
     Load true cluster IDs from a file and return as a PyTorch tensor.
@@ -104,12 +95,13 @@ def load_true_cluster_ids(file_path):
     Returns:
         torch.Tensor: Tensor containing true cluster IDs.
     """
-    # Read the file
+
     true_labels = pd.read_csv(file_path, header=None).squeeze("columns")
-    
-    # Convert to PyTorch tensor
     true_cluster_ids = torch.tensor(true_labels.values, dtype=torch.long)
     return true_cluster_ids
+
+
+# Evaluate model predictions over all test sets
 def process_folder(test_folder, ground_truth_folder, exact_true_labels,model, decoder_state_dict, device, args):
     test_files = sorted(glob.glob(os.path.join(test_folder, "*.csv")))
     ground_truth_files = sorted(glob.glob(os.path.join(ground_truth_folder, "*.csv")))
@@ -136,6 +128,7 @@ def process_folder(test_folder, ground_truth_folder, exact_true_labels,model, de
     for test_file, ground_truth_file, exact_true_labels_file in zip(test_files, ground_truth_files,exact_true_labels_files):
         print(f"\nProcessing {test_file}...")
         print(f"\exact_true_labels_file {exact_true_labels_file}...")
+
         # Load test data and ground truth
         X_test = load_data(test_file)
        
@@ -161,21 +154,16 @@ def process_folder(test_folder, ground_truth_folder, exact_true_labels,model, de
         loss = fixed_order_centroid_loss(predictions, ground_truth_centroids)
         print(f"Fixed-order evaluation loss: {loss.item()}")
 
-        # Centroid clustering metrics
-        
+        # Centroid clustering metrics  
         pred_cluster_ids = assign_clusters_knn(X_test.to(device), predictions)
-        #print("Predicted cluster IDs shape:", pred_cluster_ids.shape)
         true_cluster_ids = load_true_cluster_ids(exact_true_labels_file)
-        #print("True cluster IDs shape:", true_cluster_ids.shape)
         acc = clustering_accuracy(true_cluster_ids, pred_cluster_ids)
         print(f"Clustering Accuracy w original dataset (Hungarian Matched): {acc:.4f}")
 
         true_cluster_ids = assign_clusters_knn(X_test.to(device), ground_truth_centroids)
         acc = clustering_accuracy(true_cluster_ids, pred_cluster_ids)
         print(f"Clustering Accuracy (Hungarian Matched): {acc:.4f}")
-        # #nmi = normalized_mutual_info_score(true_cluster_ids.cpu(), pred_cluster_ids.cpu())
-        #print(f"Normalized Mutual Info (NMI): {nmi:.4f}")
-        
+      
         
         # Save original centroid plot
         save_path = os.path.join(output_folder, os.path.basename(test_file).replace(".csv", ".pdf"))
@@ -192,7 +180,6 @@ def process_folder(test_folder, ground_truth_folder, exact_true_labels,model, de
         plot_centroids(X_test, pred_sorted, gt_sorted, sorted_save_path)
 
 
-
 def main(args):
     model, config, _ = initialize_tabpfn_model(
         model_path=None,
@@ -207,7 +194,16 @@ def main(args):
     decoder_state_dict = checkpoint['decoder_state_dict']
 
     model = model.to(args.device)
-    process_folder(args.test_folder, args.ground_truth_folder, "new_data/test_w_exact_true_labels", model, decoder_state_dict, args.device, args)
+
+    process_folder(
+        args.test_folder,
+        args.ground_truth_folder,
+        "new_data/test_w_exact_true_labels",
+        model,
+        decoder_state_dict,
+        args.device,
+        args
+    )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate model predictions against ground truth centroids.")
