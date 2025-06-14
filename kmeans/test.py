@@ -127,7 +127,7 @@ def process_folder(test_folder, ground_truth_folder, exact_true_labels,model, de
 
     for test_file, ground_truth_file, exact_true_labels_file in zip(test_files, ground_truth_files,exact_true_labels_files):
         print(f"\nProcessing {test_file}...")
-        print(f"\exact_true_labels_file {exact_true_labels_file}...")
+        print(f"Exact_true_labels_file {exact_true_labels_file}...")
 
         # Load test data and ground truth
         X_test = load_data(test_file)
