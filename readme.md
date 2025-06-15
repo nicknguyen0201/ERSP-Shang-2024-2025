@@ -14,9 +14,7 @@ Below is the sequence of actions to be taken when training and testing a model f
 
     Some parameters of the dataset to take into consideration include (but are not limited to) number of features, number of data points, number of clusters, etc. It is important to note that the TabPFN encoder works best on datasets with *less than 5000 data points*, and this should be accounted for when searching for data.
 
-2. **Preprocess data using `data_preprocessing_pipeline`.** This normalizes our data to improve training and testing outcomes.
-
-3. **Obtain a cross-validation set using `cv_split.py`.** This allows our model to hypertune the parameters for training.
+2. **Preprocess data using `data_preprocessing_pipeline`.** This normalizes our data to improve training and testing outcomes, also allow us to obtain a cross-validation set to hypertune the parameters for training.
 
     One of the resources we used to evaluate the convergence of training data was [W&B](https://wandb.ai/site/), which provided specific graphs and metrics regarding the training rate of our model, and helped us tune our hyperparameters.
 
